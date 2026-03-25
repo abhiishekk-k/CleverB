@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CleverB</title>
+</head>
+<body>
+
+<h2>CleverB</h2>
+<p>Click the button below to copy the code, then paste it in browser Console on exam.cleverb.in</p>
+
+<button onclick="copyCode()">📋 Copy Code</button>
+<span id="msg"></span>
+
+<br><br>
+
+<textarea id="code" rows="80" cols="100" readonly>// ============================================
+// CLEVERB EXAM CAPTURE SCRIPT
+// Specifically designed for exam.cleverb.in
+// ============================================
+
+(async function() {
+    console.log('%c═══════════════════════════════════════', 'color: gold');
+    console.log('%c    CLEVERB EXAM CAPTURE SYSTEM', 'color: gold; font-size: 16px; font-weight: bold');
+    console.log('%c═══════════════════════════════════════', 'color: gold');
+    
+    let captured = false;
+    let examId = null;
+    
+    // Extract exam ID from URL or page
+    const urlMatch = window.location.href.match(/examId=(\d+)/);
+    if (urlMatch) examId = urlMatch[1];
+    console.log('%c📋 Exam ID:', 'color: cyan', examId || 'Not found');
+    
+    // ============================================
+    // Capture CleverB's specific API endpoints
+    // ============================================
+    const targetEndpoints = [
+        'getQuestions',
+        'startExam', 
+        'getExamData',
+        'fetchQuestions',
+        'checkExamStatus'
+    ];
+    
+    const originalFetch = window.fetch;
+    window.fetch = async function(...args) {
+        const response = await originalFetch.apply(this, args);
+        const url = args[0];
+        
+        if (url && typeof url === 'string') {
+            response.clone().text().then(data => {
+                // Check if this is a CleverB exam endpoint
+                const isExamEndpoint = targetEndpoints.some(ep => url.includes(ep));
+                
+                if (!captured && data && data.length > 50 && isExamEndpoint) {
+                    const lowerData = data.toLowerCase();
+                    if (lowerData.includes('question') || 
+                        lowerData.includes('option') || 
+                        lowerData.includes('mcq')) {
+                        
+                        captured = true;
+                        console.log('%c🎯 CLEVERB QUESTIONS CAPTURED!', 'color: lime; font-size: 14px; font-weight: bold');
+                        console.log('%c📡 Endpoint:', 'color: cyan', url);
+                        
+                        // Display full data
+                        console.log('%c📦 Full Response:', 'color: yellow', data);
+                        
+                        // Copy to clipboard
+                        await navigator.clipboard.writeText(data);
+                        console.log('%c✅ Copied to clipboard!', 'color: lime');
+                        
+                        // Download as file
+                        const blob = new Blob([data], { type: 'application/json' });
+                        const a = document.createElement('a');
+                        a.href = URL.createObjectURL(blob);
+                        a.download = `cleverb_exam_${Date.now()}.json`;
+                        a.click();
+                        console.log('%c📁 File downloaded: cleverb_exam_*.json', 'color: lime');
+                        
+                        // Try to parse and display questions
+                        try {
+                            const json = JSON.parse(data);
+                            if (json.questions) {
+                                console.table(json.questions);
+                            } else if (json.data && json.data.questions) {
+                                console.table(json.data.questions);
+                            } else if (json.results) {
+                                console.table(json.results);
+                            }
+                        } catch(e) {}
+                    }
+                }
+            }).catch(() => {});
+        }
+        return response;
+    };
+    
+    // ============================================
+    // Capture XHR requests (CleverB uses these)
+    // ============================================
+    const OriginalXHR = window.XMLHttpRequest;
+    window.XMLHttpRequest = function() {
+        const xhr = new OriginalXHR();
+        const originalOpen = xhr.open;
+        const originalSend = xhr.send;
+        
+        xhr.open = function(method, url) {
+            this._url = url;
+            return originalOpen.apply(this, arguments);
+        };
+        
+        xhr.send = function() {
+            this.addEventListener('load', function() {
+                if (!captured && this._url && this.responseText) {
+                    const isExamEndpoint = targetEndpoints.some(ep => this._url.includes(ep));
+                    
+                    if (isExamEndpoint && this.responseText.includes('question')) {
+                        captured = true;
+                        console.log('%c🎯 XHR CAPTURED!', 'color: lime');
+                        console.log('%c📡 URL:', 'color: cyan', this._url);
+                        console.log('%c📦 Data:', 'color: yellow', this.responseText.substring(0, 1500));
+                        
+                        navigator.clipboard.writeText(this.responseText);
+                        console.log('%c✅ Copied!', 'color: lime');
+                        
+                        const blob = new Blob([this.responseText], { type: 'application/json' });
+                        const a = document.createElement('a');
+                        a.href = URL.createObjectURL(blob);
+                        a.download = `cleverb_exam_${Date.now()}.json`;
+                        a.click();
+                    }
+                }
+            });
+            return originalSend.apply(this, arguments);
+        };
+        return xhr;
+    };
+    
+    // ============================================
+    // Check React state (CleverB is built with React)
+    // ============================================
+    setTimeout(() => {
+        const root = document.getElementById('root');
+        if (root) {
+            for (let key in root) {
+                if (key.includes('react')) {
+                    let fiber = root[key];
+                    let depth = 0;
+                    while (fiber && depth < 20) {
+                        if (fiber.memoizedState) {
+                            const stateStr = JSON.stringify(fiber.memoizedState);
+                            if (stateStr && stateStr.includes('question')) {
+                                console.log('%c🎯 QUESTIONS FOUND IN REACT STATE!', 'color: lime');
+                                navigator.clipboard.writeText(stateStr);
+                                captured = true;
+                                break;
+                            }
+                        }
+                        fiber = fiber.return;
+                        depth++;
+                    }
+                }
+            }
+        }
+    }, 2000);
+    
+    // ============================================
+    // Watch for START button and auto-click
+    // ============================================
+    setTimeout(() => {
+        const buttons = document.querySelectorAll('button, a, div[role="button"]');
+        let startBtn = null;
+        
+        for (let btn of buttons) {
+            if (btn.innerText && btn.innerText.toLowerCase().trim() === 'start') {
+                startBtn = btn;
+                break;
+            }
+        }
+        
+        if (startBtn) {
+            console.log('%c🎯 START button found! Clicking in 2 seconds...', 'color: yellow');
+            setTimeout(() => {
+                startBtn.click();
+                console.log('%c✅ START clicked — watching for questions...', 'color: lime');
+            }, 2000);
+        } else {
+            console.log('%c⚠️ START button not found. Click it manually.', 'color: orange');
+        }
+    }, 1000);
+    
+    // ============================================
+    // STATUS DISPLAY
+    // ============================================
+    console.log('%c═══════════════════════════════════════', 'color: gold');
+    console.log('%c✅ CLEVERB CAPTURE SYSTEM ACTIVE', 'color: lime; font-weight: bold');
+    console.log('%c📋 Questions will auto-capture when they load', 'color: cyan');
+    console.log('%c💾 File will save to Downloads folder', 'color: cyan');
+    console.log('%c📋 Data also copied to clipboard', 'color: cyan');
+    console.log('%c═══════════════════════════════════════', 'color: gold');
+})();</textarea>
+
+<script>
+function copyCode() {
+  var txt = document.getElementById('code');
+  txt.select();
+  document.execCommand('copy');
+  document.getElementById('msg').innerText = ' ✅ Copied!';
+  setTimeout(function(){ document.getElementById('msg').innerText = ''; }, 2000);
+}
+</script>
+
+</body>
+</html>
